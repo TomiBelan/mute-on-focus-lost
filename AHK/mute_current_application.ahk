@@ -1,7 +1,62 @@
-; #Include E:\ahk\VA.ahk
 #Include VA.ahk
+#Include WinHook.ahk
 
-F1::  ; F1 hotkey - toggle mute state of active window
+WinHook.Event.Add(0x3, 0x3, "ZzzForegroundChangeFn")  ; EVENT_SYSTEM_FOREGROUND
+
+global ZzzCurrentMutingHwnd
+ZzzCurrentMutingHwnd := -1
+
+global ZzzDebug
+ZzzDebug := []
+
+ZzzLog(message)
+{
+    ZzzDebug.Push(message)
+    if (ZzzDebug.Length() > 10) {
+        ZzzDebug.RemoveAt(0)
+    }
+    lines := ""
+    for index, line in ZzzDebug
+        lines .= line . "`n"
+;    Tooltip, %lines%
+}
+
+ZzzForegroundChangeFn(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime)
+{
+    WinGetTitle, ZzzActiveTitle, ahk_id %hwnd%
+    WinGet, ZzzActivePID, PID, ahk_id %hwnd%
+    WinGet, ZzzActiveStyle, Style, ahk_id %hwnd%
+
+    ZzzLog("event=" . event . " hwnd=" . hwnd . " title=" . Substr(ZzzActiveTitle, 1, 15) . " pid=" . ZzzActivePID . " style=" . ZzzActiveStyle . " current=" . ZzzCurrentMutingHwnd)
+
+    if (ZzzCurrentMutingHwnd == -1) {
+        return
+    }
+
+    if (!WinExist("ahk_id " ZzzCurrentMutingHwnd)) {
+        return
+    }
+
+    ; Process only events for windows which are visible and have a window title.
+    ; Otherwise we get spurious events when Alt+Tab starts (the task switcher window) and
+    ; when it ends (some invisible window with an empty title).
+    ; This might be related to: https://stackoverflow.com/q/65380485
+    ; Also, EVENT_SYSTEM_SWITCHEND doesn't work: https://stackoverflow.com/q/65380485
+    if ((ZzzActiveStyle & 0x10C00000) != 0x10C00000) {   ; WS_VISIBLE | WS_CAPTION
+        ZzzLog("  bad style, ignoring event")
+        return
+    }
+
+    WinGet, ZzzMutingPid, PID, ahk_id %ZzzCurrentMutingHwnd%
+    if !(Volume := GetVolumeObject(ZzzMutingPid))
+        MsgBox, There was a problem retrieving the application volume interface
+    Mute := (hwnd != ZzzCurrentMutingHwnd)
+    ZzzLog("  mute=" . mute)
+    VA_ISimpleAudioVolume_SetMute(Volume, Mute)
+    ObjRelease(Volume)
+}
+
+#F1::  ; win+F1 hotkey - toggle mute state of active window
   WinGet, ActivePid, PID, A
   if !(Volume := GetVolumeObject(ActivePid))
     MsgBox, There was a problem retrieving the application volume interface
@@ -9,6 +64,17 @@ F1::  ; F1 hotkey - toggle mute state of active window
   ; Msgbox % "Application " ActivePID " is currently " (mute ? "muted" : "not muted")
   VA_ISimpleAudioVolume_SetMute(Volume, !Mute) ;Toggle mute state
   ObjRelease(Volume)
+return
+
+#F2::  ; win+F2 hotkey - current window becomes the active muting window (muted when it doesn't have focus).
+  WinGet, ZzzActiveHwnd, ID, A
+  if (ZzzActiveHwnd = ZzzCurrentMutingHwnd) {
+    ZzzCurrentMutingHwnd := -1
+    SoundBeep, 423, 300
+  } else {
+    ZzzCurrentMutingHwnd := ZzzActiveHwnd
+    SoundBeep, 523, 300
+  }
 return
 
 ;Required for app specific mute
