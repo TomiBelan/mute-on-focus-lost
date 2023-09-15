@@ -56,7 +56,8 @@ ZzzForegroundChangeFn(hWinEventHook, event, hwnd, idObject, idChild, dwEventThre
     ObjRelease(Volume)
 }
 
-#F1::  ; win+F1 hotkey - toggle mute state of active window
+MOFL_ToggleMute()
+{
   WinGet, ActivePid, PID, A
   if !(Volume := GetVolumeObject(ActivePid))
     MsgBox, There was a problem retrieving the application volume interface
@@ -64,9 +65,10 @@ ZzzForegroundChangeFn(hWinEventHook, event, hwnd, idObject, idChild, dwEventThre
   ; Msgbox % "Application " ActivePID " is currently " (mute ? "muted" : "not muted")
   VA_ISimpleAudioVolume_SetMute(Volume, !Mute) ;Toggle mute state
   ObjRelease(Volume)
-return
+}
 
-#F2::  ; win+F2 hotkey - current window becomes the active muting window (muted when it doesn't have focus).
+MOFL_ToggleMuteOnFocusLostMode()
+{
   WinGet, ZzzActiveHwnd, ID, A
   if (ZzzActiveHwnd = ZzzCurrentMutingHwnd) {
     ZzzCurrentMutingHwnd := -1
@@ -75,7 +77,7 @@ return
     ZzzCurrentMutingHwnd := ZzzActiveHwnd
     SoundBeep, 523, 300
   }
-return
+}
 
 ;Required for app specific mute
 GetVolumeObject(Param = 0)
