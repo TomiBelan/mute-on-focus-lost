@@ -197,12 +197,12 @@ class WinHook
 			if !WinHook.Shell.Hooks
 			{
 				WinHook.Shell.Hooks := {}, WinHook.Shell.Events := {}
-				DllCall("RegisterShellHookWindow", UInt, A_ScriptHwnd)
-				MsgNum := DllCall("RegisterWindowMessage", Str, "SHELLHOOK")
-				OnMessage(MsgNum, ObjBindMethod(WinHook.Shell, "Message"))
+				DllCall("RegisterShellHookWindow", "UInt", A_ScriptHwnd)
+				MsgNum := DllCall("RegisterWindowMessage", "Str", "SHELLHOOK")
+				OnMessage(MsgNum, %ObjBindMethod(WinHook.Shell, "Message")%)
 			}
 			if !IsObject(Func)
-				Func := Func(Func)
+				Func := %Func%
 			WinHook.Shell.Hooks.Push({Func: Func, Title: wTitle, Class: wClass, Exe: wExe, Event: Event})
 			WinHook.Shell.Events[Event] := true
 			return WinHook.Shell.Hooks.MaxIndex()
@@ -214,7 +214,7 @@ class WinHook
 			For key, Hook in WinHook.Shell.Hooks
 				WinHook.Shell.Events[Hook.Event] := true
 		}
-		Report(ByRef Obj:="")
+		Report(&Obj:="")
 		{
 			Obj := WinHook.Shell.Hooks
 			For key, Hook in WinHook.Shell.Hooks
@@ -223,18 +223,18 @@ class WinHook
 		}
 		Deregister()
 		{
-			DllCall("DeregisterShellHookWindow", UInt, A_ScriptHwnd)
+			DllCall("DeregisterShellHookWindow", "UInt", A_ScriptHwnd)
 			WinHook.Shell.Hooks := "", WinHook.Shell.Events := ""		
 		}
 		Message(Event, Hwnd)  ; Private Method
 		{
-			DetectHiddenWindows, On
+			DetectHiddenWindows(true)
 			If (WinHook.Shell.Events[Event] or WinHook.Shell.Events[0]) 
 			{
 				
-				WinGetTitle, wTitle, ahk_id %Hwnd%
-				WinGetClass, wClass, ahk_id %Hwnd%
-				WinGet, wExe, ProcessName, ahk_id %Hwnd%
+				wTitle := WinGetTitle("ahk_id " Hwnd)
+				wClass := WinGetClass("ahk_id " Hwnd)
+				wExe := WinGetProcessName("ahk_id " Hwnd)
 				for key, Hook in WinHook.Shell.Hooks
 					if ((Hook.Title = wTitle or Hook.Title = "") and (Hook.Class = wClass or Hook.Class = "") and (Hook.Exe = wExe or Hook.Exe = "") and (Hook.Event = Event or Hook.Event = 0))
 						return Hook.Func.Call(Hwnd, wTitle, wClass, wExe, Event)
@@ -248,23 +248,16 @@ class WinHook
 			if !WinHook.Event.Hooks
 			{
 				WinHook.Event.Hooks := {}
-				static CB_WinEventProc := RegisterCallback(WinHook.Event.Message)
+				static CB_WinEventProc := CallbackCreate(%WinHook.Event.Message%)
 				OnExit(ObjBindMethod(WinHook.Event, "UnHookAll"))
 			}
-			hWinEventHook := DllCall("SetWinEventHook"
-				, "UInt",	eventMin						;  UINT eventMin
-				, "UInt",	eventMax						;  UINT eventMax
-				, "Ptr" ,	0x0								;  HMODULE hmodWinEventProc
-				, "Ptr" ,	CB_WinEventProc					;  WINEVENTPROC lpfnWinEventProc
-				, "UInt" ,	idProcess						;  DWORD idProcess
-				, "UInt",	0x0								;  DWORD idThread
-				, "UInt",	0x0|0x2)  						;  UINT dwflags, OutOfContext|SkipOwnProcess
+			hWinEventHook := DllCall("SetWinEventHook"				, "UInt",	eventMin				, "UInt",	eventMax				, "Ptr" ,	0x0				, "Ptr" ,	CB_WinEventProc				, "UInt" ,	idProcess				, "UInt",	0x0				, "UInt",	0x0|0x2)
 			if !IsObject(eventProc)
-				eventProc := Func(eventProc)
+				eventProc := %eventProc%
 			WinHook.Event.Hooks[hWinEventHook] := {eventMin: eventMin, eventMax: eventMax, eventProc: eventProc, idProcess: idProcess, WinTitle: WinTitle}
 			return hWinEventHook
 		}
-		Report(ByRef Obj:="")
+		Report(&Obj:="")
 		{
 			Obj := WinHook.Event.Hooks
 			For hWinEventHook, Hook in WinHook.Event.Hooks
@@ -284,11 +277,16 @@ class WinHook
 		}
 		Message(event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime)  ; 'Private Method 
 		{
-			DetectHiddenWindows, On
+			DetectHiddenWindows(true)
 			Hook := WinHook.Event.Hooks[hWinEventHook := this] ; this' is hidden param1 because method is called as func
-			WinGet, List, List, % Hook.WinTitle
-			Loop % List
-				if  (List%A_Index% = hwnd)
+			oList := WinGetList(Hook.WinTitle,,,)
+			aList := Array()
+			List := oList.Length
+			For v in oList
+			{   aList.Push(v)
+			}
+			Loop aList.Length
+				if (aList[A_Index] = hwnd)
 					return Hook.eventProc.Call(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime)
 		}
 	}
