@@ -1,39 +1,44 @@
 #Include VA.ahk
 #Include WinHook.ahk
 
-WinHook.Event.Add(0x3, 0x3, "ZzzForegroundChangeFn")  ; EVENT_SYSTEM_FOREGROUND
+WinHook.Event.Add(0x3, 0x3, "MOFL_ForegroundChangeFn")  ; EVENT_SYSTEM_FOREGROUND
 
-global ZzzCurrentMutingHwnd
-ZzzCurrentMutingHwnd := -1
+global MOFL_CurrentMutingHwnd
+MOFL_CurrentMutingHwnd := -1
 
-global ZzzDebug
-ZzzDebug := []
+global MOFL_LogLines
+MOFL_LogLines := []
 
-ZzzLog(message)
+global MOFL_EnableLog
+MOFL_EnableLog := false
+
+MOFL_Log(message)
 {
-    ZzzDebug.Push(message)
-    if (ZzzDebug.Length() > 10) {
-        ZzzDebug.RemoveAt(0)
+    MOFL_LogLines.Push(message)
+    if (MOFL_LogLines.Length() > 10) {
+        MOFL_LogLines.RemoveAt(0)
     }
-    lines := ""
-    for index, line in ZzzDebug
-        lines .= line . "`n"
-;    Tooltip, %lines%
+    if (MOFL_EnableLog) {
+        lines := ""
+        for index, line in MOFL_LogLines
+            lines .= line . "`n"
+        Tooltip, %lines%
+    }
 }
 
-ZzzForegroundChangeFn(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime)
+MOFL_ForegroundChangeFn(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime)
 {
     WinGetTitle, ZzzActiveTitle, ahk_id %hwnd%
     WinGet, ZzzActivePID, PID, ahk_id %hwnd%
     WinGet, ZzzActiveStyle, Style, ahk_id %hwnd%
 
-    ZzzLog("event=" . event . " hwnd=" . hwnd . " title=" . Substr(ZzzActiveTitle, 1, 15) . " pid=" . ZzzActivePID . " style=" . ZzzActiveStyle . " current=" . ZzzCurrentMutingHwnd)
+    MOFL_Log("event=" . event . " hwnd=" . hwnd . " title=" . Substr(ZzzActiveTitle, 1, 15) . " pid=" . ZzzActivePID . " style=" . ZzzActiveStyle . " current=" . MOFL_CurrentMutingHwnd)
 
-    if (ZzzCurrentMutingHwnd == -1) {
+    if (MOFL_CurrentMutingHwnd == -1) {
         return
     }
 
-    if (!WinExist("ahk_id " ZzzCurrentMutingHwnd)) {
+    if (!WinExist("ahk_id " MOFL_CurrentMutingHwnd)) {
         return
     }
 
@@ -43,15 +48,15 @@ ZzzForegroundChangeFn(hWinEventHook, event, hwnd, idObject, idChild, dwEventThre
     ; This might be related to: https://stackoverflow.com/q/65380485
     ; Also, EVENT_SYSTEM_SWITCHEND doesn't work: https://stackoverflow.com/q/65380485
     if ((ZzzActiveStyle & 0x10C00000) != 0x10C00000) {   ; WS_VISIBLE | WS_CAPTION
-        ZzzLog("  bad style, ignoring event")
+        MOFL_Log("  bad style, ignoring event")
         return
     }
 
-    WinGet, ZzzMutingPid, PID, ahk_id %ZzzCurrentMutingHwnd%
+    WinGet, ZzzMutingPid, PID, ahk_id %MOFL_CurrentMutingHwnd%
     if !(Volume := GetVolumeObject(ZzzMutingPid))
         MsgBox, There was a problem retrieving the application volume interface
-    Mute := (hwnd != ZzzCurrentMutingHwnd)
-    ZzzLog("  mute=" . mute)
+    Mute := (hwnd != MOFL_CurrentMutingHwnd)
+    MOFL_Log("  mute=" . mute)
     VA_ISimpleAudioVolume_SetMute(Volume, Mute)
     ObjRelease(Volume)
 }
@@ -70,11 +75,11 @@ MOFL_ToggleMute()
 MOFL_ToggleMuteOnFocusLostMode()
 {
   WinGet, ZzzActiveHwnd, ID, A
-  if (ZzzActiveHwnd = ZzzCurrentMutingHwnd) {
-    ZzzCurrentMutingHwnd := -1
+  if (ZzzActiveHwnd = MOFL_CurrentMutingHwnd) {
+    MOFL_CurrentMutingHwnd := -1
     SoundBeep, 423, 300
   } else {
-    ZzzCurrentMutingHwnd := ZzzActiveHwnd
+    MOFL_CurrentMutingHwnd := ZzzActiveHwnd
     SoundBeep, 523, 300
   }
 }
