@@ -1,3 +1,5 @@
+; VA v2.3
+
 ;
 ; MASTER CONTROLS
 ;
@@ -219,7 +221,6 @@ VA_FindSubunit(device, target_desc, target_iid)
         target_name := "i)" target_name
     r := VA_EnumSubunits(device, "VA_FindSubunitCallback", target_name, target_iid
             , Object(0, target_index ? target_index : 1, 1, 0))
-    DllCall("GlobalFree", "uint", callback)
     return r
 }
 
@@ -243,7 +244,7 @@ VA_EnumSubunits(device, callback, target_name="", target_iid="", callback_param=
     ObjRelease(conn)
     if !conn_to
         return ; blank to indicate error
-    DllCall(NumGet(NumGet(conn_to+0)), "ptr", conn_to, "ptr", VA_GUID(IID_IPart,"{AE2DE0E4-5BCA-4F2D-AA46-5D13F8FDB3A9}"), "ptr*", part) != 0 ? part:=0 : ""
+    part := ComObjQuery(conn_to, "{AE2DE0E4-5BCA-4F2D-AA46-5D13F8FDB3A9}") ; IID_IPart
     ObjRelease(conn_to)
     if !part
         return
@@ -257,7 +258,7 @@ VA_EnumSubunitsEx(part, data_flow, callback, target_name="", target_iid="", call
     r := 0
     
     VA_IPart_GetPartType(part, type)
-    
+   
     if type = 1 ; Subunit
     {
         VA_IPart_GetName(part, name)
@@ -303,24 +304,24 @@ VA_EnumSubunitsEx(part, data_flow, callback, target_name="", target_iid="", call
 ;               | ( friendly_name | 'playback' | 'capture' ) [ ':' index ]
 VA_GetDevice(device_desc="playback")
 {
-    if ( r:= DllCall("ole32\CoCreateInstance"
-                , "ptr", VA_GUID(CLSID_MMDeviceEnumerator, "{BCDE0395-E52F-467C-8E3D-C4579291692E}")
-                , "ptr", 0, "uint", 21
-                , "ptr", VA_GUID(IID_IMMDeviceEnumerator, "{A95664D2-9614-4F35-A746-DE8DB63617E6}")
-                , "ptr*", deviceEnumerator)) != 0
+    static CLSID_MMDeviceEnumerator := "{BCDE0395-E52F-467C-8E3D-C4579291692E}"
+        , IID_IMMDeviceEnumerator := "{A95664D2-9614-4F35-A746-DE8DB63617E6}"
+    if !(deviceEnumerator := ComObjCreate(CLSID_MMDeviceEnumerator, IID_IMMDeviceEnumerator))
         return 0
     
     device := 0
     
-    ; deviceEnumerator->GetDevice(device_id, [out] device)
-    if DllCall(NumGet(NumGet(deviceEnumerator+0)+5*A_PtrSize), "ptr", deviceEnumerator, "wstr", device_desc, "ptr*", device) = 0
+    if VA_IMMDeviceEnumerator_GetDevice(deviceEnumerator, device_desc, device) = 0
         goto VA_GetDevice_Return
     
     if device_desc is integer
     {
         m2 := device_desc
         if m2 >= 4096 ; Probably a device pointer, passed here indirectly via VA_GetAudioMeter or such.
-            return m2, ObjAddRef(m2)
+        {
+            ObjAddRef(device := m2)
+            goto VA_GetDevice_Return
+        }
     }
     else
         RegExMatch(device_desc, "(.*?)\s*(?::(\d+))?$", m)
@@ -335,27 +336,23 @@ VA_GetDevice(device_desc="playback")
         flow := 2 ; eAll
     
     if (m1 . m2) = ""   ; no name or number (maybe "playback" or "capture")
-    {   ; deviceEnumerator->GetDefaultAudioEndpoint(dataFlow, role, [out] device)
-        DllCall(NumGet(NumGet(deviceEnumerator+0)+4*A_PtrSize), "ptr",deviceEnumerator, "uint",flow, "uint",0, "ptr*",device)
+    {
+        VA_IMMDeviceEnumerator_GetDefaultAudioEndpoint(deviceEnumerator, flow, 0, device)
         goto VA_GetDevice_Return
     }
 
-    ; deviceEnumerator->EnumAudioEndpoints(dataFlow, stateMask, [out] devices)
-    DllCall(NumGet(NumGet(deviceEnumerator+0)+3*A_PtrSize), "ptr",deviceEnumerator, "uint",flow, "uint",1, "ptr*",devices)
-    
-    ; devices->GetCount([out] count)
-    DllCall(NumGet(NumGet(devices+0)+3*A_PtrSize), "ptr",devices, "uint*",count)
+    VA_IMMDeviceEnumerator_EnumAudioEndpoints(deviceEnumerator, flow, 1, devices)
     
     if m1 =
-    {   ; devices->Item(m2-1, [out] device)
-        DllCall(NumGet(NumGet(devices+0)+4*A_PtrSize), "ptr",devices, "uint",m2-1, "ptr*",device)
+    {
+        VA_IMMDeviceCollection_Item(devices, m2-1, device)
         goto VA_GetDevice_Return
     }
     
+    VA_IMMDeviceCollection_GetCount(devices, count)
     index := 0
     Loop % count
-        ; devices->Item(A_Index-1, [out] device)
-        if DllCall(NumGet(NumGet(devices+0)+4*A_PtrSize), "ptr",devices, "uint",A_Index-1, "ptr*",device) = 0
+        if VA_IMMDeviceCollection_Item(devices, A_Index-1, device) = 0
             if InStr(VA_GetDeviceName(device), m1) && (m2 = "" || ++index = m2)
                 goto VA_GetDevice_Return
             else
@@ -383,6 +380,26 @@ VA_GetDeviceName(device)
     ObjRelease(store)
     VA_WStrOut(deviceName := NumGet(prop,8))
     return deviceName
+}
+
+VA_SetDefaultEndpoint(device_desc, role)
+{
+    /* Roles:
+         eConsole        = 0  ; Default Device
+         eMultimedia     = 1
+         eCommunications = 2  ; Default Communications Device
+    */
+    if ! device := VA_GetDevice(device_desc)
+        return 0
+    if VA_IMMDevice_GetId(device, id) = 0
+    {
+        cfg := ComObjCreate("{294935CE-F637-4E7C-A41B-AB255460B862}"
+                          , "{568b9108-44bf-40b4-9006-86afe5b5a620}")
+        hr := VA_xIPolicyConfigVista_SetDefaultEndpoint(cfg, id, role)
+        ObjRelease(cfg)
+    }
+    ObjRelease(device)
+    return hr = 0
 }
 
 
@@ -781,6 +798,50 @@ VA_IAudioSessionManager_GetSimpleAudioVolume(this, AudioSessionGuid, StreamFlags
     return DllCall(NumGet(NumGet(this+0)+4*A_PtrSize), "ptr", this, "ptr", VA_GUID(AudioSessionGuid), "uint", StreamFlags, "uint*", AudioVolume)
 }
 
+;
+; IMMDeviceEnumerator
+;
+VA_IMMDeviceEnumerator_EnumAudioEndpoints(this, DataFlow, StateMask, ByRef Devices) {
+    return DllCall(NumGet(NumGet(this+0)+3*A_PtrSize), "ptr", this, "int", DataFlow, "uint", StateMask, "ptr*", Devices)
+}
+VA_IMMDeviceEnumerator_GetDefaultAudioEndpoint(this, DataFlow, Role, ByRef Endpoint) {
+    return DllCall(NumGet(NumGet(this+0)+4*A_PtrSize), "ptr", this, "int", DataFlow, "int", Role, "ptr*", Endpoint)
+}
+VA_IMMDeviceEnumerator_GetDevice(this, id, ByRef Device) {
+    return DllCall(NumGet(NumGet(this+0)+5*A_PtrSize), "ptr", this, "wstr", id, "ptr*", Device)
+}
+VA_IMMDeviceEnumerator_RegisterEndpointNotificationCallback(this, Client) {
+    return DllCall(NumGet(NumGet(this+0)+6*A_PtrSize), "ptr", this, "ptr", Client)
+}
+VA_IMMDeviceEnumerator_UnregisterEndpointNotificationCallback(this, Client) {
+    return DllCall(NumGet(NumGet(this+0)+7*A_PtrSize), "ptr", this, "ptr", Client)
+}
+
+;
+; IMMDeviceCollection
+;
+VA_IMMDeviceCollection_GetCount(this, ByRef Count) {
+    return DllCall(NumGet(NumGet(this+0)+3*A_PtrSize), "ptr", this, "uint*", Count)
+}
+VA_IMMDeviceCollection_Item(this, Index, ByRef Device) {
+    return DllCall(NumGet(NumGet(this+0)+4*A_PtrSize), "ptr", this, "uint", Index, "ptr*", Device)
+}
+
+;
+; IControlInterface
+;
+VA_IControlInterface_GetName(this, ByRef Name) {
+    hr := DllCall(NumGet(NumGet(this+0)+3*A_PtrSize), "ptr", this, "ptr*", Name)
+    VA_WStrOut(Name)
+    return hr
+}
+VA_IControlInterface_GetIID(this, ByRef IID) {
+    VarSetCapacity(IID,16,0)
+    hr := DllCall(NumGet(NumGet(this+0)+4*A_PtrSize), "ptr", this, "ptr", &IID)
+    VA_GUIDOut(IID)
+    return hr
+}
+
 
 /*
     INTERFACES REQUIRING WINDOWS 7 / SERVER 2008 R2
@@ -838,4 +899,16 @@ VA_IAudioSessionEnumerator_GetCount(this, ByRef SessionCount) {
 }
 VA_IAudioSessionEnumerator_GetSession(this, SessionCount, ByRef Session) {
     return DllCall(NumGet(NumGet(this+0)+4*A_PtrSize), "ptr", this, "int", SessionCount, "ptr*", Session)
+}
+
+
+/*
+    UNDOCUMENTED INTERFACES
+*/
+
+; Thanks to Dave Amenta for publishing this interface - http://goo.gl/6L93L
+; IID := "{568b9108-44bf-40b4-9006-86afe5b5a620}"
+; CLSID := "{294935CE-F637-4E7C-A41B-AB255460B862}"
+VA_xIPolicyConfigVista_SetDefaultEndpoint(this, DeviceId, Role) {
+    return DllCall(NumGet(NumGet(this+0)+12*A_PtrSize), "ptr", this, "wstr", DeviceId, "int", Role)
 }
