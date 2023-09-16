@@ -11,16 +11,48 @@ MOFL_EnableLog := false
 
 MOFL_Log(message)
 {
+    static LogGui := false
+    static LogControl := false
+    static LogShown := false
+    LogMax := 30
+
     MOFL_LogLines.Push(message)
-    if (MOFL_LogLines.Length > 10) {
+    if (MOFL_LogLines.Length > LogMax) {
         MOFL_LogLines.RemoveAt(1)
     }
     if (MOFL_EnableLog) {
+        if !LogGui {
+            ; https://www.autohotkey.com/docs/v2/lib/Gui.htm#ExOSD
+            ; Pass through clicks: https://stackoverflow.com/q/13069717
+            ; 0x80000 = WS_EX_LAYERED, 0x20 = WS_EX_TRANSPARENT
+            LogGui := Gui()
+            LogGui.Opt("+AlwaysOnTop -Caption +ToolWindow +Disabled +E0x80000 +E0x20")
+            LogGui.BackColor := "111111"
+            LogGui.SetFont("s12 w700", "Consolas")
+            LogControl := LogGui.Add("Text", "cRed -Wrap R" LogMax " W" A_ScreenWidth, "")
+            ; WinSetTransColor(LogGui.BackColor, LogGui)
+            WinSetTransparent(150, LogGui)
+        }
+        if !LogShown {
+            LogGui.Show("x0 y0 NoActivate")
+            LogShown := true
+        }
+
         lines := ""
         for index, line in MOFL_LogLines
             lines .= line . "`n"
-        ToolTip(lines)
+        LogControl.Value := lines
+    } else if (LogShown) {
+        LogGui.Hide()
+        LogShown := false
     }
+}
+
+MOFL_ToggleLog()
+{
+    global MOFL_EnableLog
+    MOFL_EnableLog := !MOFL_EnableLog
+    MOFL_Log(MOFL_EnableLog ? "Enabled log" : "Disabled log")
 }
 
 MOFL_Report()
