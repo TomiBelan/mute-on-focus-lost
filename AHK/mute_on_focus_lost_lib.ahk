@@ -3,20 +3,17 @@
 
 WinHook.Event.Add(0x3, 0x3, "MOFL_ForegroundChangeFn")  ; EVENT_SYSTEM_FOREGROUND
 
-global MOFL_CurrentMutingHwnd
 MOFL_CurrentMutingHwnd := -1
 
-global MOFL_LogLines
 MOFL_LogLines := []
 
-global MOFL_EnableLog
 MOFL_EnableLog := false
 
 MOFL_Log(message)
 {
     MOFL_LogLines.Push(message)
     if (MOFL_LogLines.Length > 10) {
-        MOFL_LogLines.RemoveAt(0)
+        MOFL_LogLines.RemoveAt(1)
     }
     if (MOFL_EnableLog) {
         lines := ""
@@ -28,6 +25,8 @@ MOFL_Log(message)
 
 MOFL_ForegroundChangeFn(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime)
 {
+    global MOFL_CurrentMutingHwnd
+
     ZzzActiveTitle := WinGetTitle("ahk_id " hwnd)
     ZzzActivePID := WinGetPID("ahk_id " hwnd)
     ZzzActiveStyle := WinGetStyle("ahk_id " hwnd)
@@ -53,27 +52,30 @@ MOFL_ForegroundChangeFn(hWinEventHook, event, hwnd, idObject, idChild, dwEventTh
     }
 
     ZzzMutingPid := WinGetPID("ahk_id " MOFL_CurrentMutingHwnd)
-    if !(Volume := GetVolumeObject(ZzzMutingPid))
+    if !(Volume := GetVolumeObject(ZzzMutingPid)) {
         MsgBox("There was a problem retrieving the application volume interface")
+        return
+    }
     Mute := (hwnd != MOFL_CurrentMutingHwnd)
     MOFL_Log("  mute=" . mute)
-    VA_ISimpleAudioVolume_SetMute(Volume, Mute)
-    ObjRelease(Volume)
+    VA_ISimpleAudioVolume_SetMute(Volume.ptr, Mute)
 }
 
 MOFL_ToggleMute()
 {
   ActivePid := WinGetPID("A")
-  if !(Volume := GetVolumeObject(ActivePid))
+  if !(Volume := GetVolumeObject(ActivePid)) {
     MsgBox("There was a problem retrieving the application volume interface")
-  VA_ISimpleAudioVolume_GetMute(Volume, Mute)  ;Get mute state
+    return
+  }
+  VA_ISimpleAudioVolume_GetMute(Volume.ptr, &Mute)  ;Get mute state
   ; Msgbox % "Application " ActivePID " is currently " (mute ? "muted" : "not muted")
-  VA_ISimpleAudioVolume_SetMute(Volume, !Mute) ;Toggle mute state
-  ObjRelease(Volume)
+  VA_ISimpleAudioVolume_SetMute(Volume.ptr, !Mute) ;Toggle mute state
 }
 
 MOFL_ToggleMuteOnFocusLostMode()
 {
+  global MOFL_CurrentMutingHwnd
   ZzzActiveHwnd := WinGetID("A")
   if (ZzzActiveHwnd = MOFL_CurrentMutingHwnd) {
     MOFL_CurrentMutingHwnd := -1
@@ -87,7 +89,9 @@ MOFL_ToggleMuteOnFocusLostMode()
 ;Required for app specific mute
 GetVolumeObject(Param := 0)
 {
-    static IID_IASM2 := "{77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F}"    , IID_IASC2 := "{bfb7ff88-7239-4fc9-8fa2-07c950be9c6d}"    , IID_ISAV := "{87CE5498-68D6-44E5-9215-6DA47EF883D8}"
+    static IID_IASM2 := "{77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F}"
+    , IID_IASC2 := "{bfb7ff88-7239-4fc9-8fa2-07c950be9c6d}"
+    , IID_ISAV := "{87CE5498-68D6-44E5-9215-6DA47EF883D8}"
 
     ; Get PID from process name
     if !isInteger(Param)
@@ -100,24 +104,26 @@ GetVolumeObject(Param := 0)
     DAE := VA_GetDevice()
 
     ; activate the session manager
-    VA_IMMDevice_Activate(DAE, IID_IASM2, 0, 0, IASM2)
+    VA_IMMDevice_Activate(DAE, IID_IASM2, 0, 0, &IASM2)
 
     ; enumerate sessions for on this device
-    VA_IAudioSessionManager2_GetSessionEnumerator(IASM2, IASE)
-    VA_IAudioSessionEnumerator_GetCount(IASE, Count)
+    VA_IAudioSessionManager2_GetSessionEnumerator(IASM2, &IASE)
+    VA_IAudioSessionEnumerator_GetCount(IASE, &Count)
+
+    ISAV := ""
 
     ; search for an audio session with the required name
     Loop Count
     {
         ; Get the IAudioSessionControl object
-        VA_IAudioSessionEnumerator_GetSession(IASE, A_Index-1, IASC)
+        VA_IAudioSessionEnumerator_GetSession(IASE, A_Index-1, &IASC)
 
         ; Query the IAudioSessionControl for an IAudioSessionControl2 object
         IASC2 := ComObjQuery(IASC, IID_IASC2)
         ObjRelease(IASC)
 
         ; Get the session's process ID
-        VA_IAudioSessionControl2_GetProcessID(IASC2, SPID)
+        VA_IAudioSessionControl2_GetProcessID(IASC2.ptr, &SPID)
 
         ; If the process name is the one we are looking for
         if (SPID == Param)
@@ -125,10 +131,8 @@ GetVolumeObject(Param := 0)
             ; Query for the ISimpleAudioVolume
             ISAV := ComObjQuery(IASC2, IID_ISAV)
 
-            ObjRelease(IASC2)
             break
         }
-        ObjRelease(IASC2)
     }
     ObjRelease(IASE)
     ObjRelease(IASM2)
@@ -139,15 +143,15 @@ GetVolumeObject(Param := 0)
 ;
 ; ISimpleAudioVolume : {87CE5498-68D6-44E5-9215-6DA47EF883D8}
 ;
-VA_ISimpleAudioVolume_SetMasterVolume(this, &fLevel, GuidEventContext:="") {
+VA_ISimpleAudioVolume_SetMasterVolume(this, fLevel, GuidEventContext:="") {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "float", fLevel, "ptr", VA_GUID(GuidEventContext))
 }
 VA_ISimpleAudioVolume_GetMasterVolume(this, &fLevel) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "float*", &fLevel)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "float*", &fLevel := 0)
 }
-VA_ISimpleAudioVolume_SetMute(this, &Muted, GuidEventContext:="") {
+VA_ISimpleAudioVolume_SetMute(this, Muted, GuidEventContext:="") {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", this, "int", Muted, "ptr", VA_GUID(GuidEventContext))
 }
 VA_ISimpleAudioVolume_GetMute(this, &Muted) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+6*A_PtrSize, "UPtr"), "ptr", this, "int*", &Muted)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+6*A_PtrSize, "UPtr"), "ptr", this, "int*", &Muted := 0)
 }

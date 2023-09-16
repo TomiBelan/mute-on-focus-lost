@@ -1,4 +1,5 @@
 ; VA v2.3
+; (Basic port to AHK v2. Not very tested.)
 
 ;
 ; MASTER CONTROLS
@@ -9,9 +10,9 @@ VA_GetMasterVolume(channel:="", device_desc:="playback")
     if ! aev := VA_GetAudioEndpointVolume(device_desc)
         return
     if (channel = "")
-        VA_IAudioEndpointVolume_GetMasterVolumeLevelScalar(aev, vol)
+        VA_IAudioEndpointVolume_GetMasterVolumeLevelScalar(aev, &vol)
     else
-        VA_IAudioEndpointVolume_GetChannelVolumeLevelScalar(aev, channel-1, vol)
+        VA_IAudioEndpointVolume_GetChannelVolumeLevelScalar(aev, channel-1, &vol)
     ObjRelease(aev)
     return Round(vol*100,3)
 }
@@ -32,7 +33,7 @@ VA_GetMasterChannelCount(device_desc:="playback")
 {
     if ! aev := VA_GetAudioEndpointVolume(device_desc)
         return
-    VA_IAudioEndpointVolume_GetChannelCount(aev, count)
+    VA_IAudioEndpointVolume_GetChannelCount(aev, &count)
     ObjRelease(aev)
     return count
 }
@@ -49,7 +50,7 @@ VA_GetMasterMute(device_desc:="playback")
 {
     if ! aev := VA_GetAudioEndpointVolume(device_desc)
         return
-    VA_IAudioEndpointVolume_GetMute(aev, mute)
+    VA_IAudioEndpointVolume_GetMute(aev, &mute)
     ObjRelease(aev)
     return mute
 }
@@ -62,15 +63,15 @@ VA_GetVolume(subunit_desc:="1", channel:="", device_desc:="playback")
 {
     if ! avl := VA_GetDeviceSubunit(device_desc, subunit_desc, "{7FB7B48F-531D-44A2-BCB3-5AD5A134B3DC}")
         return
-    VA_IPerChannelDbLevel_GetChannelCount(avl, channel_count)
+    VA_IPerChannelDbLevel_GetChannelCount(avl, &channel_count)
     if (channel = "")
     {
         vol := "0"
         
         Loop channel_count
         {
-            VA_IPerChannelDbLevel_GetLevelRange(avl, A_Index-1, min_dB, max_dB, step_dB)
-            VA_IPerChannelDbLevel_GetLevel(avl, A_Index-1, this_vol)
+            VA_IPerChannelDbLevel_GetLevelRange(avl, A_Index-1, &min_dB, &max_dB, &step_dB)
+            VA_IPerChannelDbLevel_GetLevel(avl, A_Index-1, &this_vol)
             this_vol := VA_dB2Scalar(this_vol, min_dB, max_dB)
             
             ; "Speakers Properties" reports the highest channel as the volume.
@@ -81,8 +82,8 @@ VA_GetVolume(subunit_desc:="1", channel:="", device_desc:="playback")
     else     if ((StrCompare(channel, 1) > 0) && (StrCompare(channel, "channel_count") < 0))
     {
         channel -= 1
-        VA_IPerChannelDbLevel_GetLevelRange(avl, channel, min_dB, max_dB, step_dB)
-        VA_IPerChannelDbLevel_GetLevel(avl, channel, vol)
+        VA_IPerChannelDbLevel_GetLevelRange(avl, channel, &min_dB, &max_dB, &step_dB)
+        VA_IPerChannelDbLevel_GetLevel(avl, channel, &vol)
         vol := VA_dB2Scalar(vol, min_dB, max_dB)
     }
     ObjRelease(avl)
@@ -96,7 +97,7 @@ VA_SetVolume(vol, subunit_desc:="1", channel:="", device_desc:="playback")
     
     vol := vol<0 ? 0 : vol>100 ? 100 : vol
     
-    VA_IPerChannelDbLevel_GetChannelCount(avl, channel_count)
+    VA_IPerChannelDbLevel_GetChannelCount(avl, &channel_count)
     
     if (channel = "")
     {
@@ -107,8 +108,8 @@ VA_SetVolume(vol, subunit_desc:="1", channel:="", device_desc:="playback")
         
         Loop channel_count
         {
-            VA_IPerChannelDbLevel_GetLevelRange(avl, A_Index-1, min_dB, max_dB, step_dB)
-            VA_IPerChannelDbLevel_GetLevel(avl, A_Index-1, this_vol)
+            VA_IPerChannelDbLevel_GetLevelRange(avl, A_Index-1, &min_dB, &max_dB, &step_dB)
+            VA_IPerChannelDbLevel_GetLevel(avl, A_Index-1, &this_vol)
             this_vol := VA_dB2Scalar(this_vol, min_dB, max_dB)
             
             channel%A_Index%vol := this_vol
@@ -131,7 +132,7 @@ VA_SetVolume(vol, subunit_desc:="1", channel:="", device_desc:="playback")
     else     if (channel >= 1 && channel <= channel_count)
     {
         channel -= 1
-        VA_IPerChannelDbLevel_GetLevelRange(avl, channel, min_dB, max_dB, step_dB)
+        VA_IPerChannelDbLevel_GetLevelRange(avl, channel, &min_dB, &max_dB, &step_dB)
         VA_IPerChannelDbLevel_SetLevel(avl, channel, VA_Scalar2dB(vol/100, min_dB, max_dB))
     }
     ObjRelease(avl)
@@ -141,7 +142,7 @@ VA_GetChannelCount(subunit_desc:="1", device_desc:="playback")
 {
     if ! avl := VA_GetDeviceSubunit(device_desc, subunit_desc, "{7FB7B48F-531D-44A2-BCB3-5AD5A134B3DC}")
         return
-    VA_IPerChannelDbLevel_GetChannelCount(avl, channel_count)
+    VA_IPerChannelDbLevel_GetChannelCount(avl, &channel_count)
     ObjRelease(avl)
     return channel_count
 }
@@ -158,7 +159,7 @@ VA_GetMute(subunit_desc:="1", device_desc:="playback")
 {
     if ! amute := VA_GetDeviceSubunit(device_desc, subunit_desc, "{DF45AEEA-B74A-4B6B-AFAD-2366B6AA012E}")
         return
-    VA_IAudioMute_GetMute(amute, muted)
+    VA_IAudioMute_GetMute(amute, &muted)
     ObjRelease(amute)
     return muted
 }
@@ -171,7 +172,7 @@ VA_GetAudioMeter(device_desc:="playback")
 {
     if ! device := VA_GetDevice(device_desc)
         return 0
-    VA_IMMDevice_Activate(device, "{C02216F6-8C67-4B5B-9D00-D008E73E0064}", 7, 0, audioMeter)
+    VA_IMMDevice_Activate(device, "{C02216F6-8C67-4B5B-9D00-D008E73E0064}", 7, 0, &audioMeter)
     ObjRelease(device)
     return audioMeter
 }
@@ -181,10 +182,10 @@ VA_GetDevicePeriod(device_desc, &default_period, &minimum_period:="")
     defaultPeriod := minimumPeriod := 0
     if ! device := VA_GetDevice(device_desc)
         return false
-    VA_IMMDevice_Activate(device, "{1CB9AD4C-DBFA-4c32-B178-C2F568A703B2}", 7, 0, audioClient)
+    VA_IMMDevice_Activate(device, "{1CB9AD4C-DBFA-4c32-B178-C2F568A703B2}", 7, 0, &audioClient)
     ObjRelease(device)
     ; IAudioClient::GetDevicePeriod
-    DllCall(NumGet(NumGet(audioClient+0, "UPtr")+9*A_PtrSize, "UPtr"), "ptr", audioClient, "int64*", &default_period, "int64*", &minimum_period)
+    DllCall(NumGet(NumGet(audioClient+0, "UPtr")+9*A_PtrSize, "UPtr"), "ptr", audioClient, "int64*", &default_period := 0, "int64*", &minimum_period := 0)
     ; Convert 100-nanosecond units to milliseconds.
     default_period /= 10000
     minimum_period /= 10000    
@@ -196,7 +197,7 @@ VA_GetAudioEndpointVolume(device_desc:="playback")
 {
     if ! device := VA_GetDevice(device_desc)
         return 0
-    VA_IMMDevice_Activate(device, "{5CDF2C82-841E-4546-9722-0CF74078229A}", 7, 0, endpointVolume)
+    VA_IMMDevice_Activate(device, "{5CDF2C82-841E-4546-9722-0CF74078229A}", 7, 0, &endpointVolume)
     ObjRelease(device)
     return endpointVolume
 }
@@ -215,11 +216,16 @@ VA_FindSubunit(device, target_desc, target_iid)
     if isInteger(target_desc)
         target_index := target_desc
     else
-        RegExMatch(target_desc, "(?<_name>.*?)(?::(?<_index>\d+))?$", target)
+    {
+        RegExMatch(target_desc, "(?<_name>.*?)(?::(?<_index>\d+))?$", &target_match)
+        target_name := target_match["_name"]
+        target_index := target_match["_index"]
+    }
     ; v2.01: Since target_name is now a regular expression, default to case-insensitive mode if no options are specified.
     if !RegExMatch(target_name, "^[^\(]+\)")
         target_name := "i)" target_name
-    r := VA_EnumSubunits(device, "VA_FindSubunitCallback", target_name, target_iid            , Map(0, target_index ? target_index : 1, 1, 0))
+    r := VA_EnumSubunits(device, "VA_FindSubunitCallback", target_name, target_iid
+            , Map(0, target_index ? target_index : 1, 1, 0))
     return r
 }
 
@@ -235,11 +241,11 @@ VA_FindSubunitCallback(part, interface, index)
 
 VA_EnumSubunits(device, callback, target_name:="", target_iid:="", callback_param:="")
 {
-    VA_IMMDevice_Activate(device, "{2A07407E-6497-4A18-9787-32F79BD0D98F}", 7, 0, deviceTopology)
-    VA_IDeviceTopology_GetConnector(deviceTopology, 0, conn)
+    VA_IMMDevice_Activate(device, "{2A07407E-6497-4A18-9787-32F79BD0D98F}", 7, 0, &deviceTopology)
+    VA_IDeviceTopology_GetConnector(deviceTopology, 0, &conn)
     ObjRelease(deviceTopology)
-    VA_IConnector_GetConnectedTo(conn, conn_to)
-    VA_IConnector_GetDataFlow(conn, data_flow)
+    VA_IConnector_GetConnectedTo(conn, &conn_to)
+    VA_IConnector_GetDataFlow(conn, &data_flow)
     ObjRelease(conn)
     if !conn_to
         return ; blank to indicate error
@@ -247,8 +253,7 @@ VA_EnumSubunits(device, callback, target_name:="", target_iid:="", callback_para
     ObjRelease(conn_to)
     if !part
         return
-    r := VA_EnumSubunitsEx(part, data_flow, callback, target_name, target_iid, callback_param)
-    ObjRelease(part)
+    r := VA_EnumSubunitsEx(part.ptr, data_flow, callback, target_name, target_iid, callback_param)
     return r ; value returned by callback, or zero.
 }
 
@@ -256,11 +261,11 @@ VA_EnumSubunitsEx(part, data_flow, callback, target_name:="", target_iid:="", ca
 {
     r := 0
     
-    VA_IPart_GetPartType(part, type)
+    VA_IPart_GetPartType(part, &parttype)
    
-    if (type = 1) ; Subunit
+    if (parttype = 1) ; Subunit
     {
-        VA_IPart_GetName(part, name)
+        VA_IPart_GetName(part, &name)
         
         ; v2.01: target_name is now a regular expression.
         if RegExMatch(name, target_name)
@@ -268,7 +273,7 @@ VA_EnumSubunitsEx(part, data_flow, callback, target_name:="", target_iid:="", ca
             if (target_iid = "")
                 r := %callback%(part, 0, callback_param)
             else
-                if VA_IPart_Activate(part, 7, target_iid, interface) = 0
+                if VA_IPart_Activate(part, 7, target_iid, &interface) = 0
                 {
                     r := %callback%(part, interface, callback_param)
                     ; The callback is responsible for calling ObjAddRef()
@@ -282,14 +287,14 @@ VA_EnumSubunitsEx(part, data_flow, callback, target_name:="", target_iid:="", ca
     }
     
     if (data_flow = 0)
-        VA_IPart_EnumPartsIncoming(part, parts)
+        VA_IPart_EnumPartsIncoming(part, &parts)
     else
-        VA_IPart_EnumPartsOutgoing(part, parts)
+        VA_IPart_EnumPartsOutgoing(part, &parts)
     
-    VA_IPartsList_GetCount(parts, count)
+    VA_IPartsList_GetCount(parts, &count)
     Loop count
     {
-        VA_IPartsList_GetPart(parts, A_Index-1, subpart)        
+        VA_IPartsList_GetPart(parts, A_Index-1, &subpart)        
         r := VA_EnumSubunitsEx(subpart, data_flow, callback, target_name, target_iid, callback_param)
         ObjRelease(subpart)
         if r
@@ -303,14 +308,16 @@ VA_EnumSubunitsEx(part, data_flow, callback, target_name:="", target_iid:="", ca
 ;               | ( friendly_name | 'playback' | 'capture' ) [ ':' index ]
 VA_GetDevice(device_desc:="playback")
 {
-    static CLSID_MMDeviceEnumerator := "{BCDE0395-E52F-467C-8E3D-C4579291692E}"        , IID_IMMDeviceEnumerator := "{A95664D2-9614-4F35-A746-DE8DB63617E6}"
-    if !(deviceEnumerator := ComObject(CLSID_MMDeviceEnumerator, IID_IMMDeviceEnumerator))
+    static CLSID_MMDeviceEnumerator := "{BCDE0395-E52F-467C-8E3D-C4579291692E}"
+        , IID_IMMDeviceEnumerator := "{A95664D2-9614-4F35-A746-DE8DB63617E6}"
+    if !(deviceEnumeratorCom := ComObject(CLSID_MMDeviceEnumerator, IID_IMMDeviceEnumerator))
         return 0
+    deviceEnumerator := deviceEnumeratorCom.ptr
     
     device := 0
     
-    if VA_IMMDeviceEnumerator_GetDevice(deviceEnumerator, device_desc, device) = 0
-        Goto(VA_GetDevice_Return)
+    if VA_IMMDeviceEnumerator_GetDevice(deviceEnumerator, device_desc, &device) = 0
+        Goto VA_GetDevice_Return
     
     if isInteger(device_desc)
     {
@@ -318,11 +325,15 @@ VA_GetDevice(device_desc:="playback")
         if (m2 >= 4096) ; Probably a device pointer, passed here indirectly via VA_GetAudioMeter or such.
         {
             ObjAddRef(device := m2)
-            Goto(VA_GetDevice_Return)
+            Goto VA_GetDevice_Return
         }
     }
     else
-        RegExMatch(device_desc, "(.*?)\s*(?::(\d+))?$", m)
+    {
+        RegExMatch(device_desc, "(.*?)\s*(?::(\d+))?$", &m_match)
+        m1 := m_match[1]
+        m2 := m_match[2]
+    }
     
     if (m1 ~= "^(?i:playback|p)$")
         m1 := "", flow := 0 ; eRender
@@ -335,30 +346,29 @@ VA_GetDevice(device_desc:="playback")
     
     if (m1 . m2) = ""   ; no name or number (maybe "playback" or "capture")
     {
-        VA_IMMDeviceEnumerator_GetDefaultAudioEndpoint(deviceEnumerator, flow, 0, device)
-        Goto(VA_GetDevice_Return)
+        VA_IMMDeviceEnumerator_GetDefaultAudioEndpoint(deviceEnumerator, flow, 0, &device)
+        Goto VA_GetDevice_Return
     }
 
-    VA_IMMDeviceEnumerator_EnumAudioEndpoints(deviceEnumerator, flow, 1, devices)
+    VA_IMMDeviceEnumerator_EnumAudioEndpoints(deviceEnumerator, flow, 1, &devices)
     
     if (m1 = "")
     {
-        VA_IMMDeviceCollection_Item(devices, m2-1, device)
-        Goto(VA_GetDevice_Return)
+        VA_IMMDeviceCollection_Item(devices, m2-1, &device)
+        Goto VA_GetDevice_Return
     }
     
-    VA_IMMDeviceCollection_GetCount(devices, count)
+    VA_IMMDeviceCollection_GetCount(devices, &count)
     index := 0
     Loop count
-        if VA_IMMDeviceCollection_Item(devices, A_Index-1, device) = 0
+        if VA_IMMDeviceCollection_Item(devices, A_Index-1, &device) = 0
             if InStr(VA_GetDeviceName(device), m1) && (m2 = "" || ++index = m2)
-                Goto(VA_GetDevice_Return)
+                Goto VA_GetDevice_Return
             else
                 ObjRelease(device), device:=0
 
 VA_GetDevice_Return:
-    ObjRelease(deviceEnumerator)
-    if devices
+    if IsSet(devices)
         ObjRelease(devices)
     
     return device ; may be 0
@@ -366,15 +376,16 @@ VA_GetDevice_Return:
 
 VA_GetDeviceName(device)
 {
-    static PKEY_Device_FriendlyName
-    if !VarSetStrCapacity(&PKEY_Device_FriendlyName) ; V1toV2: if 'PKEY_Device_FriendlyName' is NOT a UTF-16 string, use 'PKEY_Device_FriendlyName := Buffer()'
-        VarSetStrCapacity(&PKEY_Device_FriendlyName, 20)        ,VA_GUID(PKEY_Device_FriendlyName :="{A45C254E-DF1C-4EFD-8020-67D146A850E0}")        ,NumPut("UPtr", 14, PKEY_Device_FriendlyName, 16) ; V1toV2: if 'PKEY_Device_FriendlyName' is NOT a UTF-16 string, use 'PKEY_Device_FriendlyName := Buffer(20)'
-    VarSetStrCapacity(&prop, 16) ; V1toV2: if 'prop' is NOT a UTF-16 string, use 'prop := Buffer(16)'
-    VA_IMMDevice_OpenPropertyStore(device, 0, store)
+    PKEY_Device_FriendlyName := Buffer(20, 0)
+    NumPut("UInt", 0xA45C254E, "UShort", 0xDF1C, "UShort", 0x4EFD, "UChar", 0x80, "UChar", 0x20, "UChar", 0x67, "UChar", 0xD1, "UChar", 0x46, "UChar", 0xA8, "UChar", 0x50, "UChar", 0xE0, "UInt", 14, PKEY_Device_FriendlyName)
+
+    prop := Buffer(16)
+    VA_IMMDevice_OpenPropertyStore(device, 0, &store)
     ; store->GetValue(.., [out] prop)
     DllCall(NumGet(NumGet(store+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", store, "ptr", PKEY_Device_FriendlyName, "ptr", prop)
     ObjRelease(store)
-    VA_WStrOut(deviceName := NumGet(prop, 8))
+    deviceName := NumGet(prop, 8, "UPtr")
+    VA_WStrOut(&deviceName)
     return deviceName
 }
 
@@ -387,11 +398,11 @@ VA_SetDefaultEndpoint(device_desc, role)
     */
     if ! device := VA_GetDevice(device_desc)
         return 0
-    if VA_IMMDevice_GetId(device, id) = 0
+    if VA_IMMDevice_GetId(device, &id) = 0
     {
-        cfg := ComObject("{294935CE-F637-4E7C-A41B-AB255460B862}", "{568b9108-44bf-40b4-9006-86afe5b5a620}")
+        cfgCom := ComObject("{294935CE-F637-4E7C-A41B-AB255460B862}", "{568b9108-44bf-40b4-9006-86afe5b5a620}")
+        cfg := cfgCom.ptr
         hr := VA_xIPolicyConfigVista_SetDefaultEndpoint(cfg, id, role)
-        ObjRelease(cfg)
     }
     ObjRelease(device)
     return hr = 0
@@ -403,27 +414,26 @@ VA_SetDefaultEndpoint(device_desc, role)
 ;
 
 ; Convert string to binary GUID structure.
-VA_GUID(&guid_out, guid_in:="%guid_out%") {
-    if (guid_in == "%guid_out%")
-        guid_in :=   guid_out
+VA_GUID(guid_in) {
     if isInteger(guid_in)
         return guid_in
-    guid_out := Buffer(16, 0) ; V1toV2: if 'guid_out' is a UTF-16 string, use 'VarSetStrCapacity(&guid_out, 16)'
-	DllCall("ole32\CLSIDFromString", "wstr", guid_in, "ptr", guid_out)
-	return &guid_out
+    guid_out := Buffer(16, 0)
+    DllCall("ole32\CLSIDFromString", "wstr", guid_in, "ptr", guid_out)
+    return guid_out
 }
 
 ; Convert binary GUID structure to string.
 VA_GUIDOut(&guid) {
-    VarSetStrCapacity(&buf, 78) ; V1toV2: if 'buf' is NOT a UTF-16 string, use 'buf := Buffer(78)'
+    buf := Buffer(78)
     DllCall("ole32\StringFromGUID2", "ptr", guid, "ptr", buf, "int", 39)
-    guid := StrGet(&buf, "UTF-16")
+    guid := StrGet(buf, "UTF-16")
 }
 
 ; Convert COM-allocated wide char string pointer to usable string.
 VA_WStrOut(&str) {
-    str := StrGet(ptr := str, "UTF-16")
-    DllCall("ole32\CoTaskMemFree", "ptr", "ptr")  ; FREES THE STRING.
+    ptr := str
+    str := StrGet(ptr, "UTF-16")
+    DllCall("ole32\CoTaskMemFree", "ptr", ptr)  ; FREES THE STRING.
 }
 
 VA_dB2Scalar(dB, min_dB, max_dB) {
@@ -447,55 +457,55 @@ VA_Scalar2dB(s, min_dB, max_dB) {
 ; IMMDevice : {D666063F-1587-4E43-81F1-B948E807363F}
 ;
 VA_IMMDevice_Activate(this, iid, ClsCtx, ActivationParams, &Interface) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "ptr", VA_GUID(iid), "uint", ClsCtx, "uint", ActivationParams, "ptr*", &Interface)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "ptr", VA_GUID(iid), "uint", ClsCtx, "uint", ActivationParams, "ptr*", &Interface := 0)
 }
 VA_IMMDevice_OpenPropertyStore(this, Access, &Properties) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "uint", Access, "ptr*", &Properties)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "uint", Access, "ptr*", &Properties := 0)
 }
 VA_IMMDevice_GetId(this, &Id) {
-    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", this, "uint*", &Id)
-    VA_WStrOut(Id)
+    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", this, "uint*", &Id := 0)
+    VA_WStrOut(&Id)
     return hr
 }
 VA_IMMDevice_GetState(this, &State) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+6*A_PtrSize, "UPtr"), "ptr", this, "uint*", &State)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+6*A_PtrSize, "UPtr"), "ptr", this, "uint*", &State := 0)
 }
 
 ;
 ; IDeviceTopology : {2A07407E-6497-4A18-9787-32F79BD0D98F}
 ;
 VA_IDeviceTopology_GetConnectorCount(this, &Count) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "uint*", &Count)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "uint*", &Count := 0)
 }
 VA_IDeviceTopology_GetConnector(this, Index, &Connector) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "uint", Index, "ptr*", &Connector)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "uint", Index, "ptr*", &Connector := 0)
 }
 VA_IDeviceTopology_GetSubunitCount(this, &Count) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", this, "uint*", &Count)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", this, "uint*", &Count := 0)
 }
 VA_IDeviceTopology_GetSubunit(this, Index, &Subunit) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+6*A_PtrSize, "UPtr"), "ptr", this, "uint", Index, "ptr*", &Subunit)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+6*A_PtrSize, "UPtr"), "ptr", this, "uint", Index, "ptr*", &Subunit := 0)
 }
 VA_IDeviceTopology_GetPartById(this, Id, &Part) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+7*A_PtrSize, "UPtr"), "ptr", this, "uint", Id, "ptr*", &Part)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+7*A_PtrSize, "UPtr"), "ptr", this, "uint", Id, "ptr*", &Part := 0)
 }
 VA_IDeviceTopology_GetDeviceId(this, &DeviceId) {
-    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+8*A_PtrSize, "UPtr"), "ptr", this, "uint*", &DeviceId)
-    VA_WStrOut(DeviceId)
+    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+8*A_PtrSize, "UPtr"), "ptr", this, "uint*", &DeviceId := 0)
+    VA_WStrOut(&DeviceId)
     return hr
 }
 VA_IDeviceTopology_GetSignalPath(this, PartFrom, PartTo, RejectMixedPaths, &Parts) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+9*A_PtrSize, "UPtr"), "ptr", this, "ptr", PartFrom, "ptr", PartTo, "int", RejectMixedPaths, "ptr*", &Parts)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+9*A_PtrSize, "UPtr"), "ptr", this, "ptr", PartFrom, "ptr", PartTo, "int", RejectMixedPaths, "ptr*", &Parts := 0)
 }
 
 ;
 ; IConnector : {9c2c4058-23f5-41de-877a-df3af236a09e}
 ;
 VA_IConnector_GetType(this, &Type) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "int*", &Type)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "int*", &Type := 0)
 }
 VA_IConnector_GetDataFlow(this, &Flow) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "int*", &Flow)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "int*", &Flow := 0)
 }
 VA_IConnector_ConnectTo(this, ConnectTo) {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", this, "ptr", ConnectTo)
@@ -504,19 +514,19 @@ VA_IConnector_Disconnect(this) {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+6*A_PtrSize, "UPtr"), "ptr", this)
 }
 VA_IConnector_IsConnected(this, &Connected) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+7*A_PtrSize, "UPtr"), "ptr", this, "int*", &Connected)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+7*A_PtrSize, "UPtr"), "ptr", this, "int*", &Connected := 0)
 }
 VA_IConnector_GetConnectedTo(this, &ConTo) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+8*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &ConTo)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+8*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &ConTo := 0)
 }
 VA_IConnector_GetConnectorIdConnectedTo(this, &ConnectorId) {
-    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+9*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &ConnectorId)
-    VA_WStrOut(ConnectorId)
+    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+9*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &ConnectorId := 0)
+    VA_WStrOut(&ConnectorId)
     return hr
 }
 VA_IConnector_GetDeviceIdConnectedTo(this, &DeviceId) {
-    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+10*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &DeviceId)
-    VA_WStrOut(DeviceId)
+    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+10*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &DeviceId := 0)
+    VA_WStrOut(&DeviceId)
     return hr
 }
 
@@ -524,44 +534,44 @@ VA_IConnector_GetDeviceIdConnectedTo(this, &DeviceId) {
 ; IPart : {AE2DE0E4-5BCA-4F2D-AA46-5D13F8FDB3A9}
 ;
 VA_IPart_GetName(this, &Name) {
-    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &Name)
-    VA_WStrOut(Name)
+    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &Name := 0)
+    VA_WStrOut(&Name)
     return hr
 }
 VA_IPart_GetLocalId(this, &Id) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "uint*", &Id)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "uint*", &Id := 0)
 }
 VA_IPart_GetGlobalId(this, &GlobalId) {
-    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &GlobalId)
-    VA_WStrOut(GlobalId)
+    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &GlobalId := 0)
+    VA_WStrOut(&GlobalId)
     return hr
 }
 VA_IPart_GetPartType(this, &PartType) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+6*A_PtrSize, "UPtr"), "ptr", this, "int*", &PartType)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+6*A_PtrSize, "UPtr"), "ptr", this, "int*", &PartType := 0)
 }
 VA_IPart_GetSubType(this, &SubType) {
-    SubType := Buffer(16, 0) ; V1toV2: if 'SubType' is a UTF-16 string, use 'VarSetStrCapacity(&SubType, 16)'
+    SubType := Buffer(16, 0)
     hr := DllCall(NumGet(NumGet(this+0, "UPtr")+7*A_PtrSize, "UPtr"), "ptr", this, "ptr", SubType)
-    VA_GUIDOut(SubType)
+    VA_GUIDOut(&SubType)
     return hr
 }
 VA_IPart_GetControlInterfaceCount(this, &Count) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+8*A_PtrSize, "UPtr"), "ptr", this, "uint*", &Count)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+8*A_PtrSize, "UPtr"), "ptr", this, "uint*", &Count := 0)
 }
 VA_IPart_GetControlInterface(this, Index, &InterfaceDesc) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+9*A_PtrSize, "UPtr"), "ptr", this, "uint", Index, "ptr*", &InterfaceDesc)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+9*A_PtrSize, "UPtr"), "ptr", this, "uint", Index, "ptr*", &InterfaceDesc := 0)
 }
 VA_IPart_EnumPartsIncoming(this, &Parts) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+10*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &Parts)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+10*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &Parts := 0)
 }
 VA_IPart_EnumPartsOutgoing(this, &Parts) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+11*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &Parts)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+11*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &Parts := 0)
 }
 VA_IPart_GetTopologyObject(this, &Topology) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+12*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &Topology)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+12*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &Topology := 0)
 }
 VA_IPart_Activate(this, ClsContext, iid, &Object) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+13*A_PtrSize, "UPtr"), "ptr", this, "uint", ClsContext, "ptr", VA_GUID(iid), "ptr*", &Object)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+13*A_PtrSize, "UPtr"), "ptr", this, "uint", ClsContext, "ptr", VA_GUID(iid), "ptr*", &Object := 0)
 }
 VA_IPart_RegisterControlChangeCallback(this, iid, Notify) {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+14*A_PtrSize, "UPtr"), "ptr", this, "ptr", VA_GUID(iid), "ptr", Notify)
@@ -574,10 +584,10 @@ VA_IPart_UnregisterControlChangeCallback(this, Notify) {
 ; IPartsList : {6DAA848C-5EB0-45CC-AEA5-998A2CDA1FFB}
 ;
 VA_IPartsList_GetCount(this, &Count) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "uint*", &Count)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "uint*", &Count := 0)
 }
 VA_IPartsList_GetPart(this, INdex, &Part) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "uint", Index, "ptr*", &Part)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "uint", Index, "ptr*", &Part := 0)
 }
 
 ;
@@ -590,7 +600,7 @@ VA_IAudioEndpointVolume_UnregisterControlChangeNotify(this, Notify) {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "ptr", Notify)
 }
 VA_IAudioEndpointVolume_GetChannelCount(this, &ChannelCount) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", this, "uint*", &ChannelCount)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", this, "uint*", &ChannelCount := 0)
 }
 VA_IAudioEndpointVolume_SetMasterVolumeLevel(this, LevelDB, GuidEventContext:="") {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+6*A_PtrSize, "UPtr"), "ptr", this, "float", LevelDB, "ptr", VA_GUID(GuidEventContext))
@@ -599,10 +609,10 @@ VA_IAudioEndpointVolume_SetMasterVolumeLevelScalar(this, Level, GuidEventContext
     return DllCall(NumGet(NumGet(this+0, "UPtr")+7*A_PtrSize, "UPtr"), "ptr", this, "float", Level, "ptr", VA_GUID(GuidEventContext))
 }
 VA_IAudioEndpointVolume_GetMasterVolumeLevel(this, &LevelDB) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+8*A_PtrSize, "UPtr"), "ptr", this, "float*", &LevelDB)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+8*A_PtrSize, "UPtr"), "ptr", this, "float*", &LevelDB := 0)
 }
 VA_IAudioEndpointVolume_GetMasterVolumeLevelScalar(this, &Level) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+9*A_PtrSize, "UPtr"), "ptr", this, "float*", &Level)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+9*A_PtrSize, "UPtr"), "ptr", this, "float*", &Level := 0)
 }
 VA_IAudioEndpointVolume_SetChannelVolumeLevel(this, Channel, LevelDB, GuidEventContext:="") {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+10*A_PtrSize, "UPtr"), "ptr", this, "uint", Channel, "float", LevelDB, "ptr", VA_GUID(GuidEventContext))
@@ -611,19 +621,19 @@ VA_IAudioEndpointVolume_SetChannelVolumeLevelScalar(this, Channel, Level, GuidEv
     return DllCall(NumGet(NumGet(this+0, "UPtr")+11*A_PtrSize, "UPtr"), "ptr", this, "uint", Channel, "float", Level, "ptr", VA_GUID(GuidEventContext))
 }
 VA_IAudioEndpointVolume_GetChannelVolumeLevel(this, Channel, &LevelDB) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+12*A_PtrSize, "UPtr"), "ptr", this, "uint", Channel, "float*", &LevelDB)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+12*A_PtrSize, "UPtr"), "ptr", this, "uint", Channel, "float*", &LevelDB := 0)
 }
 VA_IAudioEndpointVolume_GetChannelVolumeLevelScalar(this, Channel, &Level) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+13*A_PtrSize, "UPtr"), "ptr", this, "uint", Channel, "float*", &Level)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+13*A_PtrSize, "UPtr"), "ptr", this, "uint", Channel, "float*", &Level := 0)
 }
 VA_IAudioEndpointVolume_SetMute(this, Mute, GuidEventContext:="") {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+14*A_PtrSize, "UPtr"), "ptr", this, "int", Mute, "ptr", VA_GUID(GuidEventContext))
 }
 VA_IAudioEndpointVolume_GetMute(this, &Mute) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+15*A_PtrSize, "UPtr"), "ptr", this, "int*", &Mute)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+15*A_PtrSize, "UPtr"), "ptr", this, "int*", &Mute := 0)
 }
 VA_IAudioEndpointVolume_GetVolumeStepInfo(this, &Step, &StepCount) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+16*A_PtrSize, "UPtr"), "ptr", this, "uint*", &Step, "uint*", &StepCount)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+16*A_PtrSize, "UPtr"), "ptr", this, "uint*", &Step := 0, "uint*", &StepCount := 0)
 }
 VA_IAudioEndpointVolume_VolumeStepUp(this, GuidEventContext:="") {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+17*A_PtrSize, "UPtr"), "ptr", this, "ptr", VA_GUID(GuidEventContext))
@@ -632,10 +642,10 @@ VA_IAudioEndpointVolume_VolumeStepDown(this, GuidEventContext:="") {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+18*A_PtrSize, "UPtr"), "ptr", this, "ptr", VA_GUID(GuidEventContext))
 }
 VA_IAudioEndpointVolume_QueryHardwareSupport(this, &HardwareSupportMask) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+19*A_PtrSize, "UPtr"), "ptr", this, "uint*", &HardwareSupportMask)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+19*A_PtrSize, "UPtr"), "ptr", this, "uint*", &HardwareSupportMask := 0)
 }
 VA_IAudioEndpointVolume_GetVolumeRange(this, &MinDB, &MaxDB, &IncrementDB) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+20*A_PtrSize, "UPtr"), "ptr", this, "float*", &MinDB, "float*", &MaxDB, "float*", &IncrementDB)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+20*A_PtrSize, "UPtr"), "ptr", this, "float*", &MinDB := 0, "float*", &MaxDB := 0, "float*", &IncrementDB := 0)
 }
 
 ;
@@ -646,13 +656,13 @@ VA_IAudioEndpointVolume_GetVolumeRange(this, &MinDB, &MaxDB, &IncrementDB) {
 ;   IAudioTreble      : {0A717812-694E-4907-B74B-BAFA5CFDCA7B}
 ;
 VA_IPerChannelDbLevel_GetChannelCount(this, &Channels) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "uint*", &Channels)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "uint*", &Channels := 0)
 }
 VA_IPerChannelDbLevel_GetLevelRange(this, Channel, &MinLevelDB, &MaxLevelDB, &Stepping) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "uint", Channel, "float*", &MinLevelDB, "float*", &MaxLevelDB, "float*", &Stepping)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "uint", Channel, "float*", &MinLevelDB := 0, "float*", &MaxLevelDB := 0, "float*", &Stepping := 0)
 }
 VA_IPerChannelDbLevel_GetLevel(this, Channel, &LevelDB) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", this, "uint", Channel, "float*", &LevelDB)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", this, "uint", Channel, "float*", &LevelDB := 0)
 }
 VA_IPerChannelDbLevel_SetLevel(this, Channel, LevelDB, GuidEventContext:="") {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+6*A_PtrSize, "UPtr"), "ptr", this, "uint", Channel, "float", LevelDB, "ptr", VA_GUID(GuidEventContext))
@@ -671,14 +681,14 @@ VA_IAudioMute_SetMute(this, Muted, GuidEventContext:="") {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "int", Muted, "ptr", VA_GUID(GuidEventContext))
 }
 VA_IAudioMute_GetMute(this, &Muted) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "int*", &Muted)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "int*", &Muted := 0)
 }
 
 ;
 ; IAudioAutoGainControl : {85401FD4-6DE4-4b9d-9869-2D6753A82F3C}
 ;
 VA_IAudioAutoGainControl_GetEnabled(this, &Enabled) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "int*", &Enabled)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "int*", &Enabled := 0)
 }
 VA_IAudioAutoGainControl_SetEnabled(this, Enable, GuidEventContext:="") {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "int", Enable, "ptr", VA_GUID(GuidEventContext))
@@ -688,16 +698,16 @@ VA_IAudioAutoGainControl_SetEnabled(this, Enable, GuidEventContext:="") {
 ; IAudioMeterInformation : {C02216F6-8C67-4B5B-9D00-D008E73E0064}
 ;
 VA_IAudioMeterInformation_GetPeakValue(this, &Peak) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "float*", &Peak)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "float*", &Peak := 0)
 }
 VA_IAudioMeterInformation_GetMeteringChannelCount(this, &ChannelCount) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "uint*", &ChannelCount)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "uint*", &ChannelCount := 0)
 }
 VA_IAudioMeterInformation_GetChannelsPeakValues(this, ChannelCount, PeakValues) {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", this, "uint", ChannelCount, "ptr", PeakValues)
 }
 VA_IAudioMeterInformation_QueryHardwareSupport(this, &HardwareSupportMask) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+6*A_PtrSize, "UPtr"), "ptr", this, "uint*", &HardwareSupportMask)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+6*A_PtrSize, "UPtr"), "ptr", this, "uint*", &HardwareSupportMask := 0)
 }
 
 ;
@@ -707,22 +717,22 @@ VA_IAudioClient_Initialize(this, ShareMode, StreamFlags, BufferDuration, Periodi
     return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "int", ShareMode, "uint", StreamFlags, "int64", BufferDuration, "int64", Periodicity, "ptr", Format, "ptr", VA_GUID(AudioSessionGuid))
 }
 VA_IAudioClient_GetBufferSize(this, &NumBufferFrames) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "uint*", &NumBufferFrames)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "uint*", &NumBufferFrames := 0)
 }
 VA_IAudioClient_GetStreamLatency(this, &Latency) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", this, "int64*", &Latency)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", this, "int64*", &Latency := 0)
 }
 VA_IAudioClient_GetCurrentPadding(this, &NumPaddingFrames) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+6*A_PtrSize, "UPtr"), "ptr", this, "uint*", &NumPaddingFrames)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+6*A_PtrSize, "UPtr"), "ptr", this, "uint*", &NumPaddingFrames := 0)
 }
 VA_IAudioClient_IsFormatSupported(this, ShareMode, Format, &ClosestMatch) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+7*A_PtrSize, "UPtr"), "ptr", this, "int", ShareMode, "ptr", Format, "ptr*", &ClosestMatch)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+7*A_PtrSize, "UPtr"), "ptr", this, "int", ShareMode, "ptr", Format, "ptr*", &ClosestMatch := 0)
 }
 VA_IAudioClient_GetMixFormat(this, &Format) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+8*A_PtrSize, "UPtr"), "ptr", this, "uint*", &Format)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+8*A_PtrSize, "UPtr"), "ptr", this, "uint*", &Format := 0)
 }
 VA_IAudioClient_GetDevicePeriod(this, &DefaultDevicePeriod, &MinimumDevicePeriod) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+9*A_PtrSize, "UPtr"), "ptr", this, "int64*", &DefaultDevicePeriod, "int64*", &MinimumDevicePeriod)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+9*A_PtrSize, "UPtr"), "ptr", this, "int64*", &DefaultDevicePeriod := 0, "int64*", &MinimumDevicePeriod := 0)
 }
 VA_IAudioClient_Start(this) {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+10*A_PtrSize, "UPtr"), "ptr", this)
@@ -737,7 +747,7 @@ VA_IAudioClient_SetEventHandle(this, eventHandle) {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+13*A_PtrSize, "UPtr"), "ptr", this, "ptr", eventHandle)
 }
 VA_IAudioClient_GetService(this, iid, &Service) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+14*A_PtrSize, "UPtr"), "ptr", this, "ptr", VA_GUID(iid), "ptr*", &Service)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+14*A_PtrSize, "UPtr"), "ptr", this, "ptr", VA_GUID(iid), "ptr*", &Service := 0)
 }
 
 ;
@@ -749,28 +759,28 @@ AudioSessionStateActive = 1
 AudioSessionStateExpired = 2
 */
 VA_IAudioSessionControl_GetState(this, &State) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "int*", &State)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "int*", &State := 0)
 }
 VA_IAudioSessionControl_GetDisplayName(this, &DisplayName) {
-    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &DisplayName)
-    VA_WStrOut(DisplayName)
+    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &DisplayName := 0)
+    VA_WStrOut(&DisplayName)
     return hr
 }
 VA_IAudioSessionControl_SetDisplayName(this, DisplayName, EventContext) {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", this, "wstr", DisplayName, "ptr", VA_GUID(EventContext))
 }
 VA_IAudioSessionControl_GetIconPath(this, &IconPath) {
-    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+6*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &IconPath)
-    VA_WStrOut(IconPath)
+    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+6*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &IconPath := 0)
+    VA_WStrOut(&IconPath)
     return hr
 }
 VA_IAudioSessionControl_SetIconPath(this, IconPath) {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+7*A_PtrSize, "UPtr"), "ptr", this, "wstr", IconPath)
 }
 VA_IAudioSessionControl_GetGroupingParam(this, &Param) {
-    Param := Buffer(16, 0) ; V1toV2: if 'Param' is a UTF-16 string, use 'VarSetStrCapacity(&Param, 16)'
+    Param := Buffer(16, 0)
     hr := DllCall(NumGet(NumGet(this+0, "UPtr")+8*A_PtrSize, "UPtr"), "ptr", this, "ptr", Param)
-    VA_GUIDOut(Param)
+    VA_GUIDOut(&Param)
     return hr
 }
 VA_IAudioSessionControl_SetGroupingParam(this, Param, EventContext) {
@@ -790,20 +800,20 @@ VA_IAudioSessionManager_GetAudioSessionControl(this, AudioSessionGuid) {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "ptr", VA_GUID(AudioSessionGuid))
 }
 VA_IAudioSessionManager_GetSimpleAudioVolume(this, AudioSessionGuid, StreamFlags, &AudioVolume) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "ptr", VA_GUID(AudioSessionGuid), "uint", StreamFlags, "uint*", &AudioVolume)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "ptr", VA_GUID(AudioSessionGuid), "uint", StreamFlags, "uint*", &AudioVolume := 0)
 }
 
 ;
 ; IMMDeviceEnumerator
 ;
 VA_IMMDeviceEnumerator_EnumAudioEndpoints(this, DataFlow, StateMask, &Devices) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "int", DataFlow, "uint", StateMask, "ptr*", &Devices)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "int", DataFlow, "uint", StateMask, "ptr*", &Devices := 0)
 }
 VA_IMMDeviceEnumerator_GetDefaultAudioEndpoint(this, DataFlow, Role, &Endpoint) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "int", DataFlow, "int", Role, "ptr*", &Endpoint)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "int", DataFlow, "int", Role, "ptr*", &Endpoint := 0)
 }
 VA_IMMDeviceEnumerator_GetDevice(this, id, &Device) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", this, "wstr", id, "ptr*", &Device)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", this, "wstr", id, "ptr*", &Device := 0)
 }
 VA_IMMDeviceEnumerator_RegisterEndpointNotificationCallback(this, Client) {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+6*A_PtrSize, "UPtr"), "ptr", this, "ptr", Client)
@@ -816,24 +826,24 @@ VA_IMMDeviceEnumerator_UnregisterEndpointNotificationCallback(this, Client) {
 ; IMMDeviceCollection
 ;
 VA_IMMDeviceCollection_GetCount(this, &Count) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "uint*", &Count)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "uint*", &Count := 0)
 }
 VA_IMMDeviceCollection_Item(this, Index, &Device) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "uint", Index, "ptr*", &Device)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "uint", Index, "ptr*", &Device := 0)
 }
 
 ;
 ; IControlInterface
 ;
 VA_IControlInterface_GetName(this, &Name) {
-    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &Name)
-    VA_WStrOut(Name)
+    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &Name := 0)
+    VA_WStrOut(&Name)
     return hr
 }
 VA_IControlInterface_GetIID(this, &IID) {
-    IID := Buffer(16, 0) ; V1toV2: if 'IID' is a UTF-16 string, use 'VarSetStrCapacity(&IID, 16)'
+    IID := Buffer(16, 0)
     hr := DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "ptr", IID)
-    VA_GUIDOut(IID)
+    VA_GUIDOut(&IID)
     return hr
 }
 
@@ -847,17 +857,17 @@ VA_IControlInterface_GetIID(this, &IID) {
 ;   extends IAudioSessionControl
 ;
 VA_IAudioSessionControl2_GetSessionIdentifier(this, &id) {
-    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+12*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &id)
-    VA_WStrOut(id)
+    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+12*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &id := 0)
+    VA_WStrOut(&id)
     return hr
 }
 VA_IAudioSessionControl2_GetSessionInstanceIdentifier(this, &id) {
-    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+13*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &id)
-    VA_WStrOut(id)
+    hr := DllCall(NumGet(NumGet(this+0, "UPtr")+13*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &id := 0)
+    VA_WStrOut(&id)
     return hr
 }
 VA_IAudioSessionControl2_GetProcessId(this, &pid) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+14*A_PtrSize, "UPtr"), "ptr", this, "uint*", &pid)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+14*A_PtrSize, "UPtr"), "ptr", this, "uint*", &pid := 0)
 }
 VA_IAudioSessionControl2_IsSystemSoundsSession(this) {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+15*A_PtrSize, "UPtr"), "ptr", this)
@@ -871,7 +881,7 @@ VA_IAudioSessionControl2_SetDuckingPreference(this, OptOut) {
 ;   extends IAudioSessionManager
 ;
 VA_IAudioSessionManager2_GetSessionEnumerator(this, &SessionEnum) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &SessionEnum)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+5*A_PtrSize, "UPtr"), "ptr", this, "ptr*", &SessionEnum := 0)
 }
 VA_IAudioSessionManager2_RegisterSessionNotification(this, SessionNotification) {
     return DllCall(NumGet(NumGet(this+0, "UPtr")+6*A_PtrSize, "UPtr"), "ptr", this, "ptr", SessionNotification)
@@ -890,10 +900,10 @@ VA_IAudioSessionManager2_UnregisterDuckNotification(this, SessionNotification) {
 ; IAudioSessionEnumerator : {E2F5BB11-0570-40CA-ACDD-3AA01277DEE8}
 ;
 VA_IAudioSessionEnumerator_GetCount(this, &SessionCount) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "int*", &SessionCount)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+3*A_PtrSize, "UPtr"), "ptr", this, "int*", &SessionCount := 0)
 }
 VA_IAudioSessionEnumerator_GetSession(this, SessionCount, &Session) {
-    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "int", SessionCount, "ptr*", &Session)
+    return DllCall(NumGet(NumGet(this+0, "UPtr")+4*A_PtrSize, "UPtr"), "ptr", this, "int", SessionCount, "ptr*", &Session := 0)
 }
 
 
