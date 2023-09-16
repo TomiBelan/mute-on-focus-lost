@@ -3,6 +3,10 @@
 
 WinHook.Event.Add(0x3, 0x3, "MOFL_ForegroundChangeFn")  ; EVENT_SYSTEM_FOREGROUND
 
+A_TrayMenu.Add("MOFL Report Status", MOFL_Report)
+
+A_TrayMenu.Add("MOFL Toggle Log", MOFL_ToggleLog)
+
 MOFL_Apps := Map()
 
 MOFL_LogLines := []
@@ -48,19 +52,23 @@ MOFL_Log(message)
     }
 }
 
-MOFL_ToggleLog()
+MOFL_ToggleLog(*)
 {
     global MOFL_EnableLog
     MOFL_EnableLog := !MOFL_EnableLog
     MOFL_Log(MOFL_EnableLog ? "Enabled log" : "Disabled log")
 }
 
-MOFL_Report()
+MOFL_Report(*)
 {
-    ZzzActiveTitle := WinGetTitle("A")
-    ZzzActivePID := WinGetPID("A")
-    ZzzActiveProcessPath := WinGetProcessPath("A")
-    result := "Active window:`n`"" ZzzActiveTitle "`"`n" ZzzActivePID " (" ZzzActiveProcessPath ")"
+    try {
+        ActiveTitle := WinGetTitle("A")
+        ActivePID := WinGetPID("A")
+        ActiveProcessPath := WinGetProcessPath("A")
+        result := "Active window:`n`"" ActiveTitle "`"`n" ActivePID " (" ActiveProcessPath ")"
+    } catch TargetError {
+        result := "Active window: none"
+    }
 
     result .= "`n`nMute on focus lost:"
     have := false

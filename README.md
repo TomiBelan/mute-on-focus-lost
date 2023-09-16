@@ -40,7 +40,7 @@ After you save the file, run it again to load the new version.
   MOFL_Apps["C:\Program Files (x86)\Steam\steamapps\common\Some Example Game\somegame.exe"] := true
   ```
 
-- For debugging and troubleshooting, add these lines to enable more key shortcuts. These keys show internal details.
+- There are custom commands in the script's system tray menu to show internal debugging information. If you want, you can assign key shortcuts for those commands by adding these lines.
 
   ``` autohotkey
   #F3:: MOFL_Report()
