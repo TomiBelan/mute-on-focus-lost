@@ -241,7 +241,7 @@ class WinHook
 					wTitle := WinGetTitle("ahk_id " Hwnd)
 					wClass := WinGetClass("ahk_id " Hwnd)
 					wExe := WinGetProcessName("ahk_id " Hwnd)
-				} Catch TargetError {
+				} Catch {
 					wTitle := ""
 					wClass := ""
 					wExe := ""

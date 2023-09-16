@@ -66,7 +66,7 @@ MOFL_Report(*)
         ActivePID := WinGetPID("A")
         ActiveProcessPath := WinGetProcessPath("A")
         result := "Active window:`n`"" ActiveTitle "`"`n" ActivePID " (" ActiveProcessPath ")"
-    } catch TargetError {
+    } catch {
         result := "Active window: none"
     }
 
@@ -125,7 +125,7 @@ MOFL_ForegroundChangeFn(hWinEventHook, event, hwnd, idObject, idChild, dwEventTh
         try {
             name := ProcessGetName(pid)
             path := ProcessGetPath(pid)
-        } catch TargetError {
+        } catch {
             name := ""
             path := ""
         }
@@ -167,7 +167,7 @@ MOFL_ToggleMuteOnFocusLostMode()
   try {
     ActiveName := WinGetProcessName("A")
     ActivePath := WinGetProcessPath("A")
-  } catch TargetError {
+  } catch {
     ActiveName := ""
     ActivePath := ""
   }
