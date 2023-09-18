@@ -96,10 +96,15 @@ MOFL_Report(*)
 
 MOFL_ForegroundChangeFn(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime)
 {
-    ZzzActiveTitle := WinGetTitle("ahk_id " hwnd)
-    ZzzActivePID := WinGetPID("ahk_id " hwnd)
-    ZzzActiveStyle := WinGetStyle("ahk_id " hwnd)
-    ZzzActiveProcessPath := WinGetProcessPath("ahk_id " hwnd)
+    try {
+        ZzzActiveTitle := WinGetTitle("ahk_id " hwnd)
+        ZzzActivePID := WinGetPID("ahk_id " hwnd)
+        ZzzActiveStyle := WinGetStyle("ahk_id " hwnd)
+        ZzzActiveProcessPath := WinGetProcessPath("ahk_id " hwnd)
+    } catch {
+        MOFL_Log("event=" event " hwnd=" hwnd " failed to winget")
+        return
+    }
 
     MOFL_Log(
         "event=" event
