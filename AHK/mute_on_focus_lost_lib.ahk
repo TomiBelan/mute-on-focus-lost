@@ -100,6 +100,7 @@ MOFL_ForegroundChangeFn(hWinEventHook, event, hwnd, idObject, idChild, dwEventTh
         ZzzActiveTitle := WinGetTitle("ahk_id " hwnd)
         ZzzActivePID := WinGetPID("ahk_id " hwnd)
         ZzzActiveStyle := WinGetStyle("ahk_id " hwnd)
+        ZzzActiveClass := WinGetClass("ahk_id " hwnd)
         ZzzActiveProcessPath := WinGetProcessPath("ahk_id " hwnd)
     } catch {
         MOFL_Log("event=" event " hwnd=" hwnd " failed to winget")
@@ -109,21 +110,28 @@ MOFL_ForegroundChangeFn(hWinEventHook, event, hwnd, idObject, idChild, dwEventTh
     MOFL_Log(
         "event=" event
         " hwnd=" hwnd
-        " title=" SubStr(ZzzActiveTitle, 1, 15)
-        " style=" ZzzActiveStyle
+        " title=" SubStr(ZzzActiveTitle, 1, 15) "..."
+        " style=0x" Format("{1:X}", ZzzActiveStyle)
+        " class=" ZzzActiveClass
         " pid=" ZzzActivePID
-        " ppath=" ZzzActiveProcessPath
+        " ppath=..." SubStr(ZzzActiveProcessPath, -15)
     )
 
-    ; Process only events for windows which are visible and have a window title.
-    ; Otherwise we get spurious events when Alt+Tab starts (the task switcher window) and
-    ; when it ends (some invisible window with an empty title).
-    ; This might be related to: https://stackoverflow.com/q/65380485
-    ; Also, EVENT_SYSTEM_SWITCHEND doesn't work: https://stackoverflow.com/q/65380485
-    if ((ZzzActiveStyle & 0x10C00000) != 0x10C00000) {   ; WS_VISIBLE | WS_CAPTION
-        MOFL_Log("  bad style, ignoring event")
+    ; Try to ignore events related to the Alt+Tab GUI.
+    ; It's better to wait until the user selects a window, so that we don't
+    ; mute it if the user decides to stay on it.
+    ; EVENT_SYSTEM_SWITCHEND doesn't work: https://stackoverflow.com/q/49588438
+    ; This detection algorithm is based on: https://stackoverflow.com/q/65380485
+    if (ZzzActiveProcessPath = A_WinDir "\explorer.exe") && (
+            ZzzActiveClass = "MultitaskingViewFrame" ||
+            ZzzActiveClass = "ForegroundStaging" ||
+            ZzzActiveClass = "TaskSwitcherWnd" ||
+            ZzzActiveClass = "TaskSwitcherOverlayWnd") {
+        MOFL_Log("  looks like alt tab, ignoring event")
         return
     }
+
+    ; TODO: Do we still need to ignore hidden windows? (ZzzActiveStyle & 0x10000000 = 0) ; WS_VISIBLE
 
     MOFL_IterateAudioSessions(handler)
     handler(pid, isav) {
