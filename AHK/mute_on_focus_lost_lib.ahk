@@ -96,26 +96,60 @@ MOFL_Report(*)
 
 MOFL_ForegroundChangeFn(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime)
 {
+    ; AutoHotkey simulates multiple threads on one real thread. So it has disadvantages of both.
+    ; According to https://www.autohotkey.com/docs/v2/misc/Threads.htm
+    ; "By default, a given hotkey or hotstring subroutine cannot be run a second time if it is already running."
+    ; But it seems MOFL_ForegroundChangeFn *can* be interrupted by itself.
+    ; This is mostly just an annoyance because MOFL_Log lines are in wrong order.
+    ;
+    ; Calling "Critical" should fix the problem (prevent interruptions), but that didn't work.
+    ; My guess is that the thread gets interrupted because it counts as an "emergency".
+    ; Emergencies include: "Any callback indirectly triggered by the thread itself (e.g. via SendMessage or DllCall)."
+    ; But does WinHook's CallbackCreate and DllCall count? I don't think it is "triggered by the thread itself". Unclear.
+    ;
+    ; Workaround: let's move most of the logic into a oneshot timer that calls "Critical".
+    ; But let's check hwnd now, because it might not exist later (especially for the alt tab UI).
+    ; Not that it matters (we ignore alt tab anyway) but this should be more robust against HWND reuse.
+
+    ZzzActiveTitle := ""
+    ZzzActivePID := ""
+    ZzzActiveStyle := ""
+    ZzzActiveClass := ""
+    ZzzActiveProcessPath := ""
+    ZzzSuccess := false
+    ZzzLogLine := "event=" event " hwnd=" hwnd " failed to winget"
+
     try {
         ZzzActiveTitle := WinGetTitle("ahk_id " hwnd)
         ZzzActivePID := WinGetPID("ahk_id " hwnd)
         ZzzActiveStyle := WinGetStyle("ahk_id " hwnd)
         ZzzActiveClass := WinGetClass("ahk_id " hwnd)
         ZzzActiveProcessPath := WinGetProcessPath("ahk_id " hwnd)
+        ZzzLogLine := (
+            "event=" event
+            " hwnd=" hwnd
+            " title=" SubStr(ZzzActiveTitle, 1, 15) "..."
+            " style=0x" Format("{1:X}", ZzzActiveStyle)
+            " class=" ZzzActiveClass
+            " pid=" ZzzActivePID
+            " ppath=..." SubStr(ZzzActiveProcessPath, -15)
+        )
+        ZzzSuccess := true
     } catch {
-        MOFL_Log("event=" event " hwnd=" hwnd " failed to winget")
-        return
     }
 
-    MOFL_Log(
-        "event=" event
-        " hwnd=" hwnd
-        " title=" SubStr(ZzzActiveTitle, 1, 15) "..."
-        " style=0x" Format("{1:X}", ZzzActiveStyle)
-        " class=" ZzzActiveClass
-        " pid=" ZzzActivePID
-        " ppath=..." SubStr(ZzzActiveProcessPath, -15)
-    )
+    SetTimer(MOFL_ForegroundChangeInner.Bind(ZzzActiveClass, ZzzActiveProcessPath, ZzzLogLine, ZzzSuccess), -1)
+}
+
+MOFL_ForegroundChangeInner(ZzzActiveClass, ZzzActiveProcessPath, ZzzLogLine, ZzzSuccess)
+{
+    Critical
+
+    MOFL_Log(ZzzLogLine)
+
+    if !ZzzSuccess {
+        return
+    }
 
     ; Try to ignore events related to the Alt+Tab GUI.
     ; It's better to wait until the user selects a window, so that we don't
