@@ -180,10 +180,14 @@ MOFL_ForegroundChangeInner(ZzzActiveClass, ZzzActiveProcessPath, ZzzLogLine, Zzz
             MOFL_Log("  " pid " (" name ") (" path ") empty")
         } else if !(MOFL_Apps.Get(name, false) || MOFL_Apps.Get(path, false)) {
             MOFL_Log("  " pid " (" name ") (" path ") not in MOFL mode")
+        } else if (path = ZzzActiveProcessPath) {
+            MOFL_Log("  " pid " (" name ") (" path ") unmuting!")
+            VA_ISimpleAudioVolume_SetMute(isav, false)
+        } else if WinExist("ahk_exe " path) {
+            MOFL_Log("  " pid " (" name ") (" path ") muting!")
+            VA_ISimpleAudioVolume_SetMute(isav, true)
         } else {
-            muting := path != ZzzActiveProcessPath
-            MOFL_Log("  " pid " (" name ") (" path ") " (muting ? "muting!" : "unmuting!"))
-            VA_ISimpleAudioVolume_SetMute(isav, muting)
+            MOFL_Log("  " pid " (" name ") (" path ") not muting because it's probably closing")
         }
     }
 }
